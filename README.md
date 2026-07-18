@@ -1,6 +1,8 @@
 <div align="center">
 
-# 🏠 HomePerch
+<img src="Assets/AppIcon.png" width="128" alt="HomePerch icon">
+
+# HomePerch
 
 **Home Assistant control, perched in your macOS menu bar.**
 
