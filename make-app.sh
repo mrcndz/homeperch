@@ -29,3 +29,14 @@ EOF
 
 codesign --force --sign - "$APP"
 echo "Built $APP - copy it to /Applications"
+
+# Optional: ./make-app.sh dmg also produces HomePerch.dmg
+if [ "$1" = "dmg" ]; then
+    STAGING=$(mktemp -d)
+    cp -R "$APP" "$STAGING/"
+    ln -s /Applications "$STAGING/Applications"
+    rm -f HomePerch.dmg
+    hdiutil create -volname HomePerch -srcfolder "$STAGING" -format UDZO -quiet HomePerch.dmg
+    rm -rf "$STAGING"
+    echo "Built HomePerch.dmg"
+fi
