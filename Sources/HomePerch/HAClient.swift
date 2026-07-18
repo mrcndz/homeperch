@@ -99,9 +99,17 @@ final class HAClient: ObservableObject {
 
     // Off the main actor: /api/states returns every entity, decode can be heavy
     private nonisolated static func fetchEntities(_ request: URLRequest) async throws -> [Entity] {
-        let (data, _) = try await URLSession.shared.data(for: request)
+        let (data, response) = try await URLSession.shared.data(for: request)
+        try validate(response)
         return try JSONDecoder().decode([Entity].self, from: data)
             .filter { $0.isToggleable || $0.domain == "sensor" }
+    }
+
+    private nonisolated static func validate(_ response: URLResponse) throws {
+        guard let http = response as? HTTPURLResponse, !(200..<300).contains(http.statusCode) else { return }
+        throw http.statusCode == 401
+            ? URLError(.userAuthenticationRequired)
+            : URLError(.badServerResponse)
     }
 
     func setState(_ entity: Entity, on: Bool) async {
@@ -110,6 +118,7 @@ final class HAClient: ObservableObject {
 
         // Optimistic update so the switch reflects the target state immediately
         let target = on ? "on" : "off"
+        let previous = entity.state
         pending[entity.entityId] = (target, Date().addingTimeInterval(5))
         if let index = entities.firstIndex(where: { $0.entityId == entity.entityId }) {
             entities[index].state = target
@@ -118,7 +127,18 @@ final class HAClient: ObservableObject {
         var req = request(url)
         req.httpMethod = "POST"
         req.httpBody = try? JSONEncoder().encode(["entity_id": entity.entityId])
-        _ = try? await URLSession.shared.data(for: req)
+        do {
+            let (_, response) = try await URLSession.shared.data(for: req)
+            try Self.validate(response)
+        } catch {
+            // Roll back the optimistic state; the call didn't take
+            pending.removeValue(forKey: entity.entityId)
+            if let index = entities.firstIndex(where: { $0.entityId == entity.entityId }) {
+                entities[index].state = previous
+            }
+            lastError = error.localizedDescription
+            return
+        }
         try? await Task.sleep(for: .seconds(1))
         await refresh()
     }
