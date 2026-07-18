@@ -5,6 +5,15 @@ struct SettingsView: View {
 
     @State private var search = ""
 
+    // Buffer connection edits; persisting per keystroke writes the file and goes live mid-typing
+    @State private var url = ""
+    @State private var tokenText = ""
+    @FocusState private var focusedField: ConnectionField?
+
+    private enum ConnectionField {
+        case url, token
+    }
+
     private var filteredEntities: [Entity] {
         guard !search.isEmpty else { return ha.entities }
         return ha.entities.filter {
@@ -24,12 +33,15 @@ struct SettingsView: View {
 
     private var connectionSection: some View {
         Section("Connection") {
-            TextField("Home Assistant URL", text: $ha.baseURL, prompt: Text("http://homeassistant.local:8123"))
-            SecureField("Long-Lived Access Token", text: $ha.token)
+            TextField("Home Assistant URL", text: $url, prompt: Text("http://homeassistant.local:8123"))
+                .focused($focusedField, equals: .url)
+            SecureField("Long-Lived Access Token", text: $tokenText)
+                .focused($focusedField, equals: .token)
             Text("Create a token in Home Assistant: Profile → Security → Long-lived access tokens.")
                 .font(.caption)
                 .foregroundStyle(.secondary)
             Button("Test Connection") {
+                commitConnection()
                 Task { await ha.refresh() }
             }
             if ha.isConnected {
@@ -40,6 +52,20 @@ struct SettingsView: View {
                     .foregroundStyle(.red)
             }
         }
+        .onAppear {
+            url = ha.baseURL
+            tokenText = ha.token
+        }
+        .onSubmit(commitConnection)
+        .onChange(of: focusedField) { _, focused in
+            if focused == nil { commitConnection() }
+        }
+    }
+
+    private func commitConnection() {
+        let trimmedURL = url.trimmingCharacters(in: .whitespacesAndNewlines)
+        if ha.baseURL != trimmedURL { ha.baseURL = trimmedURL }
+        if ha.token != tokenText { ha.token = tokenText }
     }
 
     private var favoritesSection: some View {
@@ -113,7 +139,10 @@ struct EntitySettingsRow: View {
 
     private func commitName() {
         let trimmed = name.trimmingCharacters(in: .whitespaces)
-        if trimmed.isEmpty { ha.customNames.removeValue(forKey: entity.entityId) }
-        else { ha.customNames[entity.entityId] = trimmed }
+        let desired: String? = trimmed.isEmpty ? nil : trimmed
+        // Skip no-op writes: Return triggers both onSubmit and the focus-loss commit
+        guard ha.customNames[entity.entityId] != desired else { return }
+        if let desired { ha.customNames[entity.entityId] = desired }
+        else { ha.customNames.removeValue(forKey: entity.entityId) }
     }
 }

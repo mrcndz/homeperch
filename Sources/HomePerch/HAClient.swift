@@ -71,7 +71,12 @@ final class HAClient: ObservableObject {
     }
 
     func refresh() async {
-        guard isConfigured, let url = apiURL("states") else { return }
+        guard isConfigured else { return }
+        guard let url = apiURL("states") else {
+            isConnected = false
+            lastError = "Invalid Home Assistant URL"
+            return
+        }
         refreshGeneration += 1
         let generation = refreshGeneration
         do {
@@ -101,7 +106,13 @@ final class HAClient: ObservableObject {
     private nonisolated static func fetchEntities(_ request: URLRequest) async throws -> [Entity] {
         let (data, response) = try await URLSession.shared.data(for: request)
         try validate(response)
-        return try JSONDecoder().decode([Entity].self, from: data)
+        // Element-wise decode: one malformed entity must not kill the whole list
+        struct FailableEntity: Decodable {
+            let entity: Entity?
+            init(from decoder: Decoder) { entity = try? Entity(from: decoder) }
+        }
+        return try JSONDecoder().decode([FailableEntity].self, from: data)
+            .compactMap(\.entity)
             .filter { $0.isToggleable || $0.domain == "sensor" }
     }
 
@@ -167,7 +178,8 @@ final class HAClient: ObservableObject {
     }
 
     private func apiURL(_ path: String) -> URL? {
-        URL(string: baseURL.trimmingCharacters(in: CharacterSet(charactersIn: "/")))?
+        URL(string: baseURL.trimmingCharacters(in: .whitespacesAndNewlines)
+            .trimmingCharacters(in: CharacterSet(charactersIn: "/")))?
             .appending(path: "api/\(path)")
     }
 

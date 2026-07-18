@@ -40,6 +40,8 @@ struct Config {
         ]
         try? (lines.joined(separator: "\n") + "\n")
             .write(to: Self.fileURL, atomically: true, encoding: .utf8)
+        // The token lives here in plaintext; keep it out of other users' reach
+        try? FileManager.default.setAttributes([.posixPermissions: 0o600], ofItemAtPath: Self.fileURL.path)
     }
 
     private static func decodeMap(_ value: String) -> [String: String] {
