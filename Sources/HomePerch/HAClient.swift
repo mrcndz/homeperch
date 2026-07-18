@@ -29,6 +29,8 @@ final class HAClient: ObservableObject {
     }
 
     private var refreshTask: Task<Void, Never>?
+    // Bumped on every refresh; stale responses (older generation) are discarded
+    private var refreshGeneration = 0
     // Optimistic states by entity id; refresh keeps them until HA confirms or they expire
     private var pending: [String: (state: String, until: Date)] = [:]
 
@@ -66,11 +68,12 @@ final class HAClient: ObservableObject {
 
     func refresh() async {
         guard isConfigured, let url = apiURL("states") else { return }
+        refreshGeneration += 1
+        let generation = refreshGeneration
         do {
-            let (data, _) = try await URLSession.shared.data(for: request(url))
-            let all = try JSONDecoder().decode([Entity].self, from: data)
+            let all = try await Self.fetchEntities(request(url))
+            guard generation == refreshGeneration, !Task.isCancelled else { return }
             entities = all
-                .filter { $0.isToggleable || $0.domain == "sensor" }
                 .map { entity in
                     var e = applyPending(entity)
                     e.customName = customNames[e.entityId]
@@ -80,10 +83,21 @@ final class HAClient: ObservableObject {
                 .sorted { $0.name < $1.name }
             isConnected = true
             lastError = nil
+        } catch is CancellationError {
+            return
         } catch {
+            guard generation == refreshGeneration, !Task.isCancelled else { return }
+            if (error as? URLError)?.code == .cancelled { return }
             isConnected = false
             lastError = error.localizedDescription
         }
+    }
+
+    // Off the main actor: /api/states returns every entity, decode can be heavy
+    private nonisolated static func fetchEntities(_ request: URLRequest) async throws -> [Entity] {
+        let (data, _) = try await URLSession.shared.data(for: request)
+        return try JSONDecoder().decode([Entity].self, from: data)
+            .filter { $0.isToggleable || $0.domain == "sensor" }
     }
 
     func setState(_ entity: Entity, on: Bool) async {
