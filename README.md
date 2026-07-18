@@ -24,7 +24,7 @@ A tiny, native menu bar app for toggling lights, switches, and checking sensors 
 
 ## Install
 
-**Download**: grab `HomePerch.app.zip` from the [latest release](https://github.com/mrcndz/homeperch/releases/latest), unzip, and move `HomePerch.app` to `/Applications`. The app is not notarized, so on first launch right-click it and choose **Open** (or run `xattr -d com.apple.quarantine /Applications/HomePerch.app`).
+**Download**: grab `HomePerch.dmg` from the [latest release](https://github.com/mrcndz/homeperch/releases/latest), open it, and drag HomePerch to Applications. The app is not notarized, so on first launch right-click it and choose **Open** (or run `xattr -d com.apple.quarantine /Applications/HomePerch.app`).
 
 **Or build from source** (needs Xcode command line tools, macOS 14+):
 
