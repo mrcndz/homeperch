@@ -7,9 +7,10 @@ swift build -c release
 
 APP=HomePerch.app
 rm -rf "$APP"
-mkdir -p "$APP/Contents/MacOS"
+mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
 
 cp .build/release/HomePerch "$APP/Contents/MacOS/"
+cp Assets/AppIcon.icns "$APP/Contents/Resources/"
 
 cat > "$APP/Contents/Info.plist" <<'EOF'
 <?xml version="1.0" encoding="UTF-8"?>
@@ -17,6 +18,7 @@ cat > "$APP/Contents/Info.plist" <<'EOF'
 <plist version="1.0">
 <dict>
     <key>CFBundleExecutable</key><string>HomePerch</string>
+    <key>CFBundleIconFile</key><string>AppIcon</string>
     <key>CFBundleIdentifier</key><string>dev.mrcndz.homeperch</string>
     <key>CFBundleName</key><string>HomePerch</string>
     <key>CFBundlePackageType</key><string>APPL</string>
