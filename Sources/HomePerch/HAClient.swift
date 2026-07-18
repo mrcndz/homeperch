@@ -58,12 +58,16 @@ final class HAClient: ObservableObject {
 
     func startPolling() {
         refreshTask?.cancel()
-        refreshTask = Task {
+        refreshTask = Task { [weak self] in
             while !Task.isCancelled {
-                await refresh()
+                await self?.refresh()
                 try? await Task.sleep(for: .seconds(10))
             }
         }
+    }
+
+    deinit {
+        refreshTask?.cancel()
     }
 
     func refresh() async {
